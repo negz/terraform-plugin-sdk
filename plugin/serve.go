@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"net"
 
 	"github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
@@ -31,6 +32,10 @@ type GRPCProviderFunc func() proto.ProviderServer
 type ServeOpts struct {
 	ProviderFunc ProviderFunc
 
+	// Optional net.Listener to receive gRPC requests over go-plugin on.
+	// Can be left nil usually, only exposed for testing purposes.
+	Listener net.Listener
+
 	// Wrapped versions of the above plugins will automatically shimmed and
 	// added to the GRPC functions when possible.
 	GRPCProviderFunc GRPCProviderFunc
@@ -48,7 +53,6 @@ func Serve(opts *ServeOpts) {
 	}
 
 	provider := opts.GRPCProviderFunc()
-
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: Handshake,
 		VersionedPlugins: map[int]plugin.PluginSet{
@@ -66,5 +70,6 @@ func Serve(opts *ServeOpts) {
 				return handler(ctx, req)
 			}))...)
 		},
+		Listener: opts.Listener,
 	})
 }

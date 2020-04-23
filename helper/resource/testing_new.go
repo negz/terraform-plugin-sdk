@@ -36,7 +36,15 @@ func runNewTest(t testing.T, c TestCase, providers map[string]*schema.Provider) 
 	wd := acctest.TestHelper.RequireNewWorkingDir(t)
 
 	defer func() {
-		statePreDestroy := getState(t, wd)
+		var statePreDestroy *terraform.State
+		runProviderCommand(func() error {
+			statePreDestroy = getState(t, wd)
+			return nil
+		}, wd, defaultPluginServeOpts(wd, providers))
+		runProviderCommand(func() error {
+			wd.RequireDestroy(t)
+			return nil
+		}, wd, defaultPluginServeOpts(wd, providers))
 
 		if !stateIsEmpty(statePreDestroy) {
 			runPostTestDestroy(t, c, wd)
@@ -149,7 +157,10 @@ func testIDRefresh(c TestCase, t testing.T, wd *tftest.WorkingDir, step TestStep
 	defer wd.RequireSetConfig(t, step.Config)
 
 	// Refresh!
-	wd.RequireRefresh(t)
+	runProviderCommand(func() error {
+		wd.RequireRefresh(t)
+		return nil
+	}, wd, defaultPluginServeOpts(wd, step.providers))
 	state = getState(t, wd)
 
 	// Verify attribute equivalence.
