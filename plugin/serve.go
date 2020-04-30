@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"net"
+	"os"
 
 	"github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
@@ -41,6 +42,21 @@ type ServeOpts struct {
 	GRPCProviderFunc GRPCProviderFunc
 }
 
+func logToFile(msg string) {
+	f, err := os.OpenFile("/tmp/tf-sdk-plugin-log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		panic(err)
+	}
+	_, err = f.Write([]byte(msg + "\n"))
+	if err != nil {
+		panic(err)
+	}
+	err = f.Close()
+	if err != nil {
+		panic(err)
+	}
+}
+
 // Serve serves a plugin. This function never returns and should be the final
 // function called in the main function of the plugin.
 func Serve(opts *ServeOpts) {
@@ -63,13 +79,15 @@ func Serve(opts *ServeOpts) {
 					},
 				},
 			},
+			HandshakeConfig:  Handshake,
+			VersionedPlugins: pluginSet(opts),
+			GRPCServer: func(opts []grpc.ServerOption) *grpc.Server {
+				return grpc.NewServer(append(opts, grpc.UnaryInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+					ctx = provider.(*grpcplugin.GRPCProviderServer).StopContext(ctx)
+					return handler(ctx, req)
+				}))...)
+			},
+			Listener: opts.Listener,
 		},
-		GRPCServer: func(opts []grpc.ServerOption) *grpc.Server {
-			return grpc.NewServer(append(opts, grpc.UnaryInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-				ctx = provider.(*grpcplugin.GRPCProviderServer).StopContext(ctx)
-				return handler(ctx, req)
-			}))...)
-		},
-		Listener: opts.Listener,
 	})
 }

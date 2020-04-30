@@ -21,7 +21,14 @@ func testStepNewImportState(t testing.T, c TestCase, wd *tftest.WorkingDir, step
 	}
 
 	// get state from check sequence
-	state := getState(t, wd)
+	var state *terraform.State
+	err := runProviderCommand(func() error {
+		state = getState(t, wd)
+		return nil
+	}, wd, defaultPluginServeOpts(wd, step.providers))
+	if err != nil {
+		t.Fatalf("Error getting state: %s", err)
+	}
 
 	// Determine the ID to import
 	var importId string
@@ -54,14 +61,21 @@ func testStepNewImportState(t testing.T, c TestCase, wd *tftest.WorkingDir, step
 	defer importWd.Close()
 	importWd.RequireSetConfig(t, step.Config)
 	importWd.RequireInit(t)
-	err := runProviderCommand(func() error {
+	err = runProviderCommand(func() error {
 		importWd.RequireImport(t, step.ResourceName, importId)
 		return nil
-	}, importWd, defaultPluginServeOpts(wd, step.providers))
+	}, importWd, defaultPluginServeOpts(importWd, step.providers))
 	if err != nil {
 		t.Fatalf("Error running import: %s", err)
 	}
-	importState := getState(t, wd)
+	var importState *terraform.State
+	err = runProviderCommand(func() error {
+		importState = getState(t, wd)
+		return nil
+	}, wd, defaultPluginServeOpts(wd, step.providers))
+	if err != nil {
+		t.Fatalf("Error getting state: %s", err)
+	}
 
 	// Go through the imported state and verify
 	if step.ImportStateCheck != nil {

@@ -139,22 +139,23 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 		logToFile("finished with orchestrator code")
 		if err != nil {
 			logToFile("got error from orchestrator code: " + err.Error())
-			client, e := goplugin.NewClient(&goplugin.ClientConfig{
-				Reattach: &goplugin.ReattachConfig{
-					Protocol: goplugin.Protocol(protoType),
-					Addr:     listener.Addr(),
-					Pid:      os.Getpid(),
-				},
-			}).Client()
-			if e != nil {
-				panic(e)
-			}
-			e = client.Close()
-			if e != nil {
-				panic(e)
-			}
-			logToFile("closed provider server in the face of the error")
 		}
+		client, e := goplugin.NewClient(&goplugin.ClientConfig{
+			Reattach: &goplugin.ReattachConfig{
+				Protocol: goplugin.Protocol(protoType),
+				Addr:     listener.Addr(),
+				Pid:      os.Getpid(),
+			},
+		}).Client()
+		if e != nil {
+			panic(e)
+		}
+		e = client.Close()
+		if e != nil {
+			panic(e)
+		}
+
+		logToFile("closed server")
 
 		done <- err
 		logToFile("sent error to done")
