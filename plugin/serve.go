@@ -2,9 +2,11 @@ package plugin
 
 import (
 	"context"
+	"io"
 	"net"
 	"os"
 
+	hclog "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
 
@@ -40,6 +42,9 @@ type ServeOpts struct {
 	// Wrapped versions of the above plugins will automatically shimmed and
 	// added to the GRPC functions when possible.
 	GRPCProviderFunc GRPCProviderFunc
+
+	Logger           hclog.Logger
+	ConnectionOutput io.Writer
 }
 
 func logToFile(msg string) {
@@ -87,7 +92,9 @@ func Serve(opts *ServeOpts) {
 					return handler(ctx, req)
 				}))...)
 			},
-			Listener: opts.Listener,
+			Listener:         opts.Listener,
+			Logger:           opts.Logger,
+			ConnectionOutput: opts.ConnectionOutput,
 		},
 	})
 }

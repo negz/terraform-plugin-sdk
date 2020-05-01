@@ -2,7 +2,10 @@ module github.com/hashicorp/terraform-plugin-sdk/v2
 
 go 1.14
 
-replace github.com/hashicorp/terraform-plugin-test v1.2.0 => ../terraform-plugin-test
+replace (
+	github.com/hashicorp/go-plugin v1.2.2 => ../go-plugin
+	github.com/hashicorp/terraform-plugin-test v1.2.0 => ../terraform-plugin-test
+)
 
 require (
 	github.com/apparentlymart/go-cidr v1.0.1
@@ -16,6 +19,7 @@ require (
 	github.com/hashicorp/errwrap v1.0.0
 	github.com/hashicorp/go-cleanhttp v0.5.1
 	github.com/hashicorp/go-cty v1.4.1-0.20200414143053-d3edf31b6320
+	github.com/hashicorp/go-hclog v0.9.2
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/go-plugin v1.2.2
 	github.com/hashicorp/go-uuid v1.0.1

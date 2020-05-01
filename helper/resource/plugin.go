@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
 	"github.com/hashicorp/terraform-plugin-sdk/acctest"
 	grpcplugin "github.com/hashicorp/terraform-plugin-sdk/internal/helper/plugin"
@@ -51,6 +52,12 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 	}
 	opts.Listener = listener
 	logToFile("created listener")
+	opts.Logger = hclog.New(&hclog.LoggerOptions{
+		Name:   "plugintest",
+		Level:  hclog.Trace,
+		Output: ioutil.Discard,
+	})
+	opts.ConnectionOutput = ioutil.Discard
 
 	// we're going to run the test orchestration code in a goroutine,
 	// because plugin.Serve expects to be running on the main goroutine,
@@ -146,6 +153,11 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 				Addr:     listener.Addr(),
 				Pid:      os.Getpid(),
 			},
+			Logger: hclog.New(&hclog.LoggerOptions{
+				Name:   "plugintest",
+				Level:  hclog.Trace,
+				Output: ioutil.Discard,
+			}),
 		}).Client()
 		if e != nil {
 			panic(e)
