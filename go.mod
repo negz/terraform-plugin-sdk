@@ -2,10 +2,7 @@ module github.com/hashicorp/terraform-plugin-sdk/v2
 
 go 1.14
 
-replace (
-	github.com/hashicorp/go-plugin v1.2.2 => ../go-plugin
-	github.com/hashicorp/terraform-plugin-test v1.2.0 => ../terraform-plugin-test
-)
+replace github.com/hashicorp/terraform-plugin-test v1.3.0 => ../terraform-plugin-test
 
 require (
 	github.com/apparentlymart/go-cidr v1.0.1

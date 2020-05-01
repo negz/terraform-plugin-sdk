@@ -7,17 +7,16 @@ import (
 	"net"
 	"os"
 	"runtime"
-	"runtime/debug"
 	"strconv"
 	"strings"
 
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
-	"github.com/hashicorp/terraform-plugin-sdk/acctest"
-	grpcplugin "github.com/hashicorp/terraform-plugin-sdk/internal/helper/plugin"
-	proto "github.com/hashicorp/terraform-plugin-sdk/internal/tfplugin5"
-	"github.com/hashicorp/terraform-plugin-sdk/plugin"
-	"github.com/hashicorp/terraform-plugin-sdk/terraform"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/acctest"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	grpcplugin "github.com/hashicorp/terraform-plugin-sdk/v2/internal/helper/plugin"
+	proto "github.com/hashicorp/terraform-plugin-sdk/v2/internal/tfplugin5"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/plugin"
 	tftest "github.com/hashicorp/terraform-plugin-test"
 )
 
@@ -25,11 +24,8 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 	// offer an opt-out that runs tests in separate provider processes
 	// this will behave just like prod
 	if os.Getenv("TF_TEST_PROVIDERS_OOP") != "" {
-		logToFile("not running provider server inline")
 		return f()
 	}
-
-	logToFile("starting runProviderCommand:\n" + string(debug.Stack()))
 
 	// by default, run tests in the same process as the test runner
 	// using the reattach behavior in Terraform. This ensures we get
@@ -45,13 +41,11 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 	// go-plugin will close this Listener when it's done with it. We
 	// don't need to, and in fact should not, close it ourselves. We're
 	// giving it to go-plugin to own.
-	logToFile("creating listener")
 	listener, err := serverListener()
 	if err != nil {
 		return err
 	}
 	opts.Listener = listener
-	logToFile("created listener")
 	opts.Logger = hclog.New(&hclog.LoggerOptions{
 		Name:   "plugintest",
 		Level:  hclog.Trace,
@@ -119,7 +113,6 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 			os.Getpid(),
 		)
 		wd.Setenv("TF_PROVIDER_REATTACH", reattachStr)
-		logToFile("set TF_PROVIDER_REATTACH to " + reattachStr)
 
 		// By default, Terraform kills the provider process when it
 		// finishes running a command. But the provider process is the
@@ -130,9 +123,7 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 		// there's (now) an environment variable for.
 		wd.Setenv("TF_PROVIDER_SOFT_STOP", "1")
 
-		logToFile("running terraform command")
 		err := f()
-		logToFile("ran terraform command")
 
 		// once we've run the Terraform command, let's remove the
 		// reattach information from the WorkingDir's environment. The
@@ -143,10 +134,6 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 		// confusing bug reports, let's just unset the environment
 		// variable altogether.
 		wd.Unsetenv("TF_PROVIDER_REATTACH")
-		logToFile("finished with orchestrator code")
-		if err != nil {
-			logToFile("got error from orchestrator code: " + err.Error())
-		}
 		client, e := goplugin.NewClient(&goplugin.ClientConfig{
 			Reattach: &goplugin.ReattachConfig{
 				Protocol: goplugin.Protocol(protoType),
@@ -167,10 +154,7 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 			panic(e)
 		}
 
-		logToFile("closed server")
-
 		done <- err
-		logToFile("sent error to done")
 	}()
 
 	// back in our main goroutine, we need to start up the gRPC server for
@@ -201,9 +185,7 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 	// the server which will shut down the server and this function will
 	// return. This means that we don't need to clean up the server;
 	// Terraform does that for us.
-	logToFile("starting provider")
 	plugin.Serve(opts)
-	logToFile("provider returned")
 
 	// we wait here to block on Terraform completing. The plugin.Serve
 	// function blocks until Terraform decides the plugin's work is
@@ -221,11 +203,11 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 // defaultPluginServeOpts builds ths *plugin.ServeOpts that you usually want to
 // use when running runProviderCommand. It just sets the ProviderFunc to return
 // the provider under test.
-func defaultPluginServeOpts(wd *tftest.WorkingDir, providers map[string]terraform.ResourceProvider) *plugin.ServeOpts {
+func defaultPluginServeOpts(wd *tftest.WorkingDir, providers map[string]*schema.Provider) *plugin.ServeOpts {
 	return &plugin.ServeOpts{
 		ProviderFunc: acctest.TestProviderFunc,
 		GRPCProviderFunc: func() proto.ProviderServer {
-			return grpcplugin.NewGRPCProviderServerShim(acctest.TestProviderFunc())
+			return grpcplugin.NewGRPCProviderServer(acctest.TestProviderFunc())
 		},
 	}
 }

@@ -84,17 +84,15 @@ func Serve(opts *ServeOpts) {
 					},
 				},
 			},
-			HandshakeConfig:  Handshake,
-			VersionedPlugins: pluginSet(opts),
-			GRPCServer: func(opts []grpc.ServerOption) *grpc.Server {
-				return grpc.NewServer(append(opts, grpc.UnaryInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-					ctx = provider.(*grpcplugin.GRPCProviderServer).StopContext(ctx)
-					return handler(ctx, req)
-				}))...)
-			},
-			Listener:         opts.Listener,
-			Logger:           opts.Logger,
-			ConnectionOutput: opts.ConnectionOutput,
 		},
+		GRPCServer: func(opts []grpc.ServerOption) *grpc.Server {
+			return grpc.NewServer(append(opts, grpc.UnaryInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+				ctx = provider.(*grpcplugin.GRPCProviderServer).StopContext(ctx)
+				return handler(ctx, req)
+			}))...)
+		},
+		Listener: opts.Listener,
+		Logger:   opts.Logger,
+		//ConnectionOutput: opts.ConnectionOutput,
 	})
 }
