@@ -18,7 +18,14 @@ func testStepNewConfig(t testing.T, c TestCase, wd *tftest.WorkingDir, step Test
 	idRefresh := c.IDRefreshName != ""
 
 	if !step.Destroy {
-		state := getState(t, wd)
+		var state *terraform.State
+		err := runProviderCommand(func() error {
+			state = getState(t, wd)
+			return nil
+		}, wd, defaultPluginServeOpts(wd, step.providers))
+		if err != nil {
+			return err
+		}
 		if err := testStepTaint(state, step); err != nil {
 			t.Fatalf("Error when tainting resources: %s", err)
 		}
