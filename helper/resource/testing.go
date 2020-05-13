@@ -90,7 +90,7 @@ func AddTestSweepers(name string, s *Sweeper) {
 func TestMain(m interface {
 	Run() int
 }) {
-	flag.Parse()
+	//flag.Parse()
 	if *flagSweep != "" {
 		// parse flagSweep contents for regions to run
 		regions := strings.Split(*flagSweep, ",")

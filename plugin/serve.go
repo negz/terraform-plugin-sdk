@@ -43,8 +43,9 @@ type ServeOpts struct {
 	// added to the GRPC functions when possible.
 	GRPCProviderFunc GRPCProviderFunc
 
-	Logger           hclog.Logger
-	ConnectionOutput io.Writer
+	Logger            hclog.Logger
+	ConnectionOutput  io.Writer
+	DisableStdoutSync bool
 }
 
 func logToFile(msg string) {
@@ -93,6 +94,7 @@ func Serve(opts *ServeOpts) {
 		},
 		Listener: opts.Listener,
 		Logger:   opts.Logger,
-		//ConnectionOutput: opts.ConnectionOutput,
+		//ConnectionOutput:  opts.ConnectionOutput,
+		DisableStdoutSync: opts.DisableStdoutSync,
 	})
 }

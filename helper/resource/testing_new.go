@@ -16,11 +16,19 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
-func runPostTestDestroy(t testing.T, c TestCase, wd *tftest.WorkingDir) error {
-	wd.RequireDestroy(t)
+func runPostTestDestroy(t testing.T, c TestCase, wd *tftest.WorkingDir, providers map[string]*schema.Provider) error {
+
+	runProviderCommand(func() error {
+		wd.RequireDestroy(t)
+		return nil
+	}, wd, defaultPluginServeOpts(wd, providers))
 
 	if c.CheckDestroy != nil {
-		statePostDestroy := getState(t, wd)
+		var statePostDestroy *terraform.State
+		runProviderCommand(func() error {
+			statePostDestroy = getState(t, wd)
+			return nil
+		}, wd, defaultPluginServeOpts(wd, providers))
 
 		if err := c.CheckDestroy(statePostDestroy); err != nil {
 			return err
@@ -41,13 +49,9 @@ func runNewTest(t testing.T, c TestCase, providers map[string]*schema.Provider) 
 			statePreDestroy = getState(t, wd)
 			return nil
 		}, wd, defaultPluginServeOpts(wd, providers))
-		runProviderCommand(func() error {
-			wd.RequireDestroy(t)
-			return nil
-		}, wd, defaultPluginServeOpts(wd, providers))
 
 		if !stateIsEmpty(statePreDestroy) {
-			runPostTestDestroy(t, c, wd)
+			runPostTestDestroy(t, c, wd, providers)
 		}
 
 		wd.Close()

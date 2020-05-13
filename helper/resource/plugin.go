@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"runtime"
@@ -52,6 +53,7 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 		Output: ioutil.Discard,
 	})
 	opts.ConnectionOutput = ioutil.Discard
+	opts.DisableStdoutSync = true
 
 	// we're going to run the test orchestration code in a goroutine,
 	// because plugin.Serve expects to be running on the main goroutine,
@@ -63,6 +65,7 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 	done := make(chan error)
 	go func() {
 		defer close(done)
+
 		// we build up a big reattach string here. This is given to
 		// Terraform's reattach environment variable so Terraform knows
 		// how to connect to the process running the server and
@@ -121,9 +124,15 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 		// process). So we need to tell Terraform to shut down the gRPC
 		// server instead of killing the process, which fortunately
 		// there's (now) an environment variable for.
-		wd.Setenv("TF_PROVIDER_SOFT_STOP", "1")
+		//
+		// This is now managed through the TF_PROVIDER_REATTACH
+		// variable, so this second env var is unnecessary.
+		// wd.Setenv("TF_PROVIDER_SOFT_STOP", "1")
 
 		err := f()
+		if err != nil {
+			log.Printf("[WARN] Got error running Terraform: %s", err)
+		}
 
 		// once we've run the Terraform command, let's remove the
 		// reattach information from the WorkingDir's environment. The
@@ -147,10 +156,12 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 			}),
 		}).Client()
 		if e != nil {
+			log.Printf("[WARN] error getting client: %v", e)
 			panic(e)
 		}
 		e = client.Close()
 		if e != nil {
+			log.Printf("[WARN] error closing client: %v", e)
 			panic(e)
 		}
 
