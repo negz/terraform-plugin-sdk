@@ -103,8 +103,28 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 	// when we tell Terraform how to connect, we do that with a
 	// TF_REATTACH_PROVIDERS environment variable, the value of which is a
 	// map of provider display names to reattach configs.
-	reattachStr, err := json.Marshal(map[string]*goplugin.ReattachConfig{
-		"hashicorp/" + providerName: config,
+	type reattachConfig struct {
+		Protocol string
+		Addr     struct {
+			Network string
+			String  string
+		}
+		Pid  int
+		Test bool
+	}
+	reattachStr, err := json.Marshal(map[string]reattachConfig{
+		"hashicorp/" + providerName: reattachConfig{
+			Protocol: string(config.Protocol),
+			Addr: struct {
+				Network string
+				String  string
+			}{
+				Network: config.Addr.Network(),
+				String:  config.Addr.String(),
+			},
+			Pid:  config.Pid,
+			Test: config.Test,
+		},
 	})
 	if err != nil {
 		return err
