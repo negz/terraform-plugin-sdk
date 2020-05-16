@@ -2,8 +2,8 @@ package resource
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -21,54 +21,56 @@ import (
 )
 
 func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.ServeOpts) error {
-	// offer an opt-out that runs tests in separate provider processes
-	// this will behave just like prod
-	if os.Getenv("TF_TEST_PROVIDERS_OOP") != "" {
-		return f()
-	}
+	// Run the provider in the same process as the test runner using the
+	// reattach behavior in Terraform. This ensures we get test coverage
+	// and enables the use of delve as a debugger.
 
-	// the provider name is technically supposed to be specified
-	// in the format returned by addrs.Provider.GetDisplay(), but
-	// 1. I'm not importing the entire addrs package for this and
-	// 2. we only get the provider name here. Fortunately, when
-	// only a provider name is specified in a provider block--which
-	// is how the config file we generate does things--Terraform
-	// just automatically assumes it's in the hashicorp namespace
-	// and the default registry.terraform.io host, so we can just
-	// construct the output of GetDisplay() ourselves, based on the
-	// provider name. GetDisplay() omits the default host, so for
+	// the provider name is technically supposed to be specified in the
+	// format returned by addrs.Provider.GetDisplay(), but 1. I'm not
+	// importing the entire addrs package for this and 2. we only get the
+	// provider name here. Fortunately, when only a provider name is
+	// specified in a provider block--which is how the config file we
+	// generate does things--Terraform just automatically assumes it's in
+	// the hashicorp namespace and the default registry.terraform.io host,
+	// so we can just construct the output of GetDisplay() ourselves, based
+	// on the provider name. GetDisplay() omits the default host, so for
 	// our purposes this will always be hashicorp/PROVIDER_NAME.
 	providerName := wd.GetHelper().GetPluginName()
 
-	// providerName gets returned as terraform-provider-foo, and we
-	// need just foo. So let's fix that.
+	// providerName gets returned as terraform-provider-foo, and we need
+	// just foo. So let's fix that.
 	providerName = strings.TrimPrefix(providerName, "terraform-provider-")
 
-	// We need to tell the provider which version of the Terraform
-	// protocol to serve. Usually this is negotiated with Terraform
-	// during the handshake that sets the server up, but because
-	// we're manually setting the server up, it's on us to do.
-	// Because the SDK only supports 0.12+ of Terraform at the
-	// moment, we can just set this to 5 (the latest version of the
-	// protocol) and call it a day. But if and when we get a version
-	// 6, we're going to have to figure something out.
-	protoVersion := 5 // TODO: make this configurable?
-
-	// by default, run tests in the same process as the test runner
-	// using the reattach behavior in Terraform. This ensures we get
-	// test coverage and enables the use of delve as a debugger.
-
+	// set up a context we can cancel, and defer the cancellation. This
+	// will ensure the go-plugin Server doesn't block indefinitely; we're
+	// going to use this context for it, and it knows to return when the
+	// context is canceled.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// set up a channel for go-plugin's ReattachConfig type. When the
+	// server gets up and running, this is how we'll get its connection
+	// info.
 	reattachCh := make(chan *goplugin.ReattachConfig)
 
+	// set up a close channel. When the go-plugin Server is done, it'll
+	// close this for us, so we can block on it to make sure the go-plugin
+	// Server returned.
 	closeCh := make(chan struct{})
+
+	// set up our ServeTestConfig. This tells go-plugin that we're going to
+	// manage the lifecycle of the plugin, and we're going to take care of
+	// orchestrating it. It prevents it from overwriting
+	// os.Stdout/os.Stderr, prevents clients from killing the server, makes
+	// the server a lot less noisy, and does a bunch of other stuff we
+	// want.
 	opts.TestConfig = &goplugin.ServeTestConfig{
 		Context:          ctx,
 		ReattachConfigCh: reattachCh,
 		CloseCh:          closeCh,
 	}
+
+	// if we didn't override the logger, let's set a default one.
 	if opts.Logger == nil {
 		opts.Logger = hclog.New(&hclog.LoggerOptions{
 			Name:   "plugintest",
@@ -77,8 +79,16 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 		})
 	}
 
+	// this is needed so Terraform doesn't default to expecting protocol 4;
+	// we're skipping the handshake because Terraform didn't launch the
+	// plugin.
 	os.Setenv("PLUGIN_PROTOCOL_VERSIONS", "5")
+
+	// actually run the provider! Woo
 	go plugin.Serve(opts)
+
+	// ok, now we need to know how to connect to the provider. The provider
+	// will tell us.
 	var config *goplugin.ReattachConfig
 	select {
 	case config = <-reattachCh:
@@ -89,31 +99,42 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 	if config == nil {
 		return errors.New("nil reattach config received")
 	}
-	reattachStr := fmt.Sprintf("hashicorp/%s=%d|%s|%s|%s|%d|test",
-		providerName,
-		protoVersion,
-		config.Addr.Network(),
-		config.Addr.String(),
-		config.Protocol,
-		config.Pid,
-	)
-	wd.Setenv("TF_PROVIDER_REATTACH", reattachStr)
-	err := f()
+
+	// when we tell Terraform how to connect, we do that with a
+	// TF_REATTACH_PROVIDERS environment variable, the value of which is a
+	// map of provider display names to reattach configs.
+	reattachStr, err := json.Marshal(map[string]*goplugin.ReattachConfig{
+		"hashicorp/" + providerName: config,
+	})
+	if err != nil {
+		return err
+	}
+	wd.Setenv("TF_REATTACH_PROVIDERS", string(reattachStr))
+
+	// ok, let's call whatever Terraform command the test was trying to
+	// call, now that we know it'll attach back to that server we just
+	// started.
+	err = f()
 	if err != nil {
 		log.Printf("[WARN] Got error running Terraform: %s", err)
 	}
+
+	// cancel the server so it'll return. Otherwise, this closeCh won't get
+	// closed, and we'll hang here.
 	cancel()
+
+	// wait for the server to actually shut down; it may take a moment for
+	// it to clean up, or whatever.
 	<-closeCh
 
-	// once we've run the Terraform command, let's remove the
-	// reattach information from the WorkingDir's environment. The
-	// WorkingDir will persist until the next call, but the server
-	// in the reattach info doesn't exist anymore at this point, so
-	// the reattach info is no longer valid. In theory it should be
-	// overwritten in the next call, but just to avoid any
-	// confusing bug reports, let's just unset the environment
-	// variable altogether.
-	wd.Unsetenv("TF_PROVIDER_REATTACH")
+	// once we've run the Terraform command, let's remove the reattach
+	// information from the WorkingDir's environment. The WorkingDir will
+	// persist until the next call, but the server in the reattach info
+	// doesn't exist anymore at this point, so the reattach info is no
+	// longer valid. In theory it should be overwritten in the next call,
+	// but just to avoid any confusing bug reports, let's just unset the
+	// environment variable altogether.
+	wd.Unsetenv("TF_REATTACH_PROVIDERS")
 
 	// return any error returned from the orchestration code running
 	// Terraform commands
