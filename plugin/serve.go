@@ -2,9 +2,6 @@ package plugin
 
 import (
 	"context"
-	"io"
-	"net"
-	"os"
 
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
@@ -35,32 +32,13 @@ type GRPCProviderFunc func() proto.ProviderServer
 type ServeOpts struct {
 	ProviderFunc ProviderFunc
 
-	// Optional net.Listener to receive gRPC requests over go-plugin on.
-	// Can be left nil usually, only exposed for testing purposes.
-	Listener net.Listener
-
 	// Wrapped versions of the above plugins will automatically shimmed and
 	// added to the GRPC functions when possible.
 	GRPCProviderFunc GRPCProviderFunc
 
-	Logger            hclog.Logger
-	ConnectionOutput  io.Writer
-	DisableStdoutSync bool
-}
+	Logger hclog.Logger
 
-func logToFile(msg string) {
-	f, err := os.OpenFile("/tmp/tf-sdk-plugin-log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		panic(err)
-	}
-	_, err = f.Write([]byte(msg + "\n"))
-	if err != nil {
-		panic(err)
-	}
-	err = f.Close()
-	if err != nil {
-		panic(err)
-	}
+	TestConfig *plugin.ServeTestConfig
 }
 
 // Serve serves a plugin. This function never returns and should be the final
@@ -92,9 +70,7 @@ func Serve(opts *ServeOpts) {
 				return handler(ctx, req)
 			}))...)
 		},
-		Listener: opts.Listener,
-		Logger:   opts.Logger,
-		//ConnectionOutput:  opts.ConnectionOutput,
-		DisableStdoutSync: opts.DisableStdoutSync,
+		Logger: opts.Logger,
+		Test:   opts.TestConfig,
 	})
 }

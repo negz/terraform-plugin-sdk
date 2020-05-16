@@ -721,22 +721,22 @@ func (r *Resource) InternalValidate(topSchemaMap schemaMap, writable bool) error
 
 	// Warn of deprecations
 	if r.Exists != nil {
-		log.Printf("[WARN] Exists is deprecated, please encapsulate the logic in ReadContext")
+		//log.Printf("[WARN] Exists is deprecated, please encapsulate the logic in ReadContext")
 	}
 	if r.Create != nil && r.CreateContext == nil {
-		log.Printf("[WARN] Create is deprecated, please use CreateContext")
+		//log.Printf("[WARN] Create is deprecated, please use CreateContext")
 	}
 	if r.Read != nil && r.ReadContext == nil {
-		log.Printf("[WARN] Read is deprecated, please use ReadContext")
+		//log.Printf("[WARN] Read is deprecated, please use ReadContext")
 	}
 	if r.Update != nil && r.UpdateContext == nil {
-		log.Printf("[WARN] Update is deprecated, please use UpdateContext")
+		//log.Printf("[WARN] Update is deprecated, please use UpdateContext")
 	}
 	if r.Delete != nil && r.DeleteContext == nil {
-		log.Printf("[WARN] Delete is deprecated, please use DeleteContext")
+		//log.Printf("[WARN] Delete is deprecated, please use DeleteContext")
 	}
 	if r.MigrateState != nil {
-		log.Printf("[WARN] MigrateState is deprecated, please use StateUpgraders")
+		//log.Printf("[WARN] MigrateState is deprecated, please use StateUpgraders")
 	}
 
 	return schemaMap(r.Schema).InternalValidate(tsm)
