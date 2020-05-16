@@ -3,15 +3,12 @@ package resource
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io/ioutil"
 	"log"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/hashicorp/go-hclog"
-	goplugin "github.com/hashicorp/go-plugin"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	grpcplugin "github.com/hashicorp/terraform-plugin-sdk/v2/internal/helper/plugin"
 	proto "github.com/hashicorp/terraform-plugin-sdk/v2/internal/tfplugin5"
@@ -40,35 +37,6 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 	// just foo. So let's fix that.
 	providerName = strings.TrimPrefix(providerName, "terraform-provider-")
 
-	// set up a context we can cancel, and defer the cancellation. This
-	// will ensure the go-plugin Server doesn't block indefinitely; we're
-	// going to use this context for it, and it knows to return when the
-	// context is canceled.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// set up a channel for go-plugin's ReattachConfig type. When the
-	// server gets up and running, this is how we'll get its connection
-	// info.
-	reattachCh := make(chan *goplugin.ReattachConfig)
-
-	// set up a close channel. When the go-plugin Server is done, it'll
-	// close this for us, so we can block on it to make sure the go-plugin
-	// Server returned.
-	closeCh := make(chan struct{})
-
-	// set up our ServeTestConfig. This tells go-plugin that we're going to
-	// manage the lifecycle of the plugin, and we're going to take care of
-	// orchestrating it. It prevents it from overwriting
-	// os.Stdout/os.Stderr, prevents clients from killing the server, makes
-	// the server a lot less noisy, and does a bunch of other stuff we
-	// want.
-	opts.TestConfig = &goplugin.ServeTestConfig{
-		Context:          ctx,
-		ReattachConfigCh: reattachCh,
-		CloseCh:          closeCh,
-	}
-
 	// if we didn't override the logger, let's set a default one.
 	if opts.Logger == nil {
 		opts.Logger = hclog.New(&hclog.LoggerOptions{
@@ -83,47 +51,14 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 	// plugin.
 	os.Setenv("PLUGIN_PROTOCOL_VERSIONS", "5")
 
-	// actually run the provider! Woo
-	go plugin.Serve(opts)
-
-	// ok, now we need to know how to connect to the provider. The provider
-	// will tell us.
-	var config *goplugin.ReattachConfig
-	select {
-	case config = <-reattachCh:
-	case <-time.After(2 * time.Second):
-		return errors.New("timeout waiting on reattach config")
+	ctx, cancel := context.WithCancel(context.Background())
+	config, closeCh, err := plugin.DebugServe(ctx, opts)
+	if err != nil {
+		return err
 	}
 
-	if config == nil {
-		return errors.New("nil reattach config received")
-	}
-
-	// when we tell Terraform how to connect, we do that with a
-	// TF_REATTACH_PROVIDERS environment variable, the value of which is a
-	// map of provider display names to reattach configs.
-	type reattachConfig struct {
-		Protocol string
-		Addr     struct {
-			Network string
-			String  string
-		}
-		Pid  int
-		Test bool
-	}
-	reattachStr, err := json.Marshal(map[string]reattachConfig{
-		"hashicorp/" + providerName: reattachConfig{
-			Protocol: string(config.Protocol),
-			Addr: struct {
-				Network string
-				String  string
-			}{
-				Network: config.Addr.Network(),
-				String:  config.Addr.String(),
-			},
-			Pid:  config.Pid,
-			Test: config.Test,
-		},
+	reattachStr, err := json.Marshal(map[string]plugin.ReattachConfig{
+		"hashicorp/" + providerName: config,
 	})
 	if err != nil {
 		return err
