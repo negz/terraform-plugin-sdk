@@ -60,7 +60,10 @@ func runNewTest(t testing.T, c TestCase, providers map[string]*schema.Provider) 
 	providerCfg := testProviderConfig(c)
 
 	wd.RequireSetConfig(t, providerCfg)
-	wd.RequireInit(t)
+	runProviderCommand(func() error {
+		wd.RequireInit(t)
+		return nil
+	}, wd, defaultPluginServeOpts(wd, providers))
 
 	// use this to track last step succesfully applied
 	// acts as default for import tests

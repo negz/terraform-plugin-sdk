@@ -60,7 +60,10 @@ func testStepNewImportState(t testing.T, c TestCase, wd *tftest.WorkingDir, step
 	importWd := acctest.TestHelper.RequireNewWorkingDir(t)
 	defer importWd.Close()
 	importWd.RequireSetConfig(t, step.Config)
-	importWd.RequireInit(t)
+	runProviderCommand(func() error {
+		importWd.RequireInit(t)
+		return nil
+	}, importWd, defaultPluginServeOpts(importWd, step.providers))
 	err = runProviderCommand(func() error {
 		importWd.RequireImport(t, step.ResourceName, importId)
 		return nil
