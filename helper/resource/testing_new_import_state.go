@@ -8,11 +8,10 @@ import (
 	tftest "github.com/hashicorp/terraform-plugin-test"
 	testing "github.com/mitchellh/go-testing-interface"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/acctest"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
-func testStepNewImportState(t testing.T, c TestCase, wd *tftest.WorkingDir, step TestStep, cfg string) error {
+func testStepNewImportState(t testing.T, c TestCase, helper *tftest.Helper, wd *tftest.WorkingDir, step TestStep, cfg string) error {
 	spewConf := spew.NewDefaultConfig()
 	spewConf.SortKeys = true
 
@@ -57,7 +56,7 @@ func testStepNewImportState(t testing.T, c TestCase, wd *tftest.WorkingDir, step
 			t.Fatal("Cannot import state with no specified config")
 		}
 	}
-	importWd := acctest.TestHelper.RequireNewWorkingDir(t)
+	importWd := helper.RequireNewWorkingDir(t)
 	defer importWd.Close()
 	importWd.RequireSetConfig(t, step.Config)
 	runProviderCommand(func() error {

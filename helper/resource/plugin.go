@@ -12,7 +12,6 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/acctest"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	grpcplugin "github.com/hashicorp/terraform-plugin-sdk/v2/internal/helper/plugin"
 	proto "github.com/hashicorp/terraform-plugin-sdk/v2/internal/tfplugin5"
@@ -165,10 +164,13 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 // use when running runProviderCommand. It just sets the ProviderFunc to return
 // the provider under test.
 func defaultPluginServeOpts(wd *tftest.WorkingDir, providers map[string]*schema.Provider) *plugin.ServeOpts {
+	var provider *schema.Provider
+	for _, p := range providers {
+		provider = p
+	}
 	return &plugin.ServeOpts{
-		ProviderFunc: acctest.TestProviderFunc,
 		GRPCProviderFunc: func() proto.ProviderServer {
-			return grpcplugin.NewGRPCProviderServer(acctest.TestProviderFunc())
+			return grpcplugin.NewGRPCProviderServer(provider)
 		},
 	}
 }
