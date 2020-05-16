@@ -25,16 +25,5 @@ func UseBinaryDriver(name string, providerFunc plugin.ProviderFunc) {
 	} else {
 		TestHelper = tftest.AutoInitProviderHelper(name, sourceDir)
 		TestProviderFunc = providerFunc
-		/*	binDir := filepath.Join(sourceDir, ".terraform", "plugins", "registry.terraform.io", "hashicorp", name, "v999.999.999", runtime.GOOS+"_"+runtime.GOARCH)
-			err = os.MkdirAll(binDir, 0777)
-			if err != nil {
-				panic(err)
-			}
-			f, err := os.OpenFile(filepath.Join(binDir, "terraform-plugin-"+name), os.O_CREATE, 0644)
-			if err != nil {
-				panic(err)
-			}
-			f.Close()
-		*/
 	}
 }
