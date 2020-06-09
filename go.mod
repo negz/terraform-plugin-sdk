@@ -2,11 +2,6 @@ module github.com/hashicorp/terraform-plugin-sdk/v2
 
 go 1.14
 
-replace (
-	github.com/hashicorp/go-plugin v1.2.2 => ../go-plugin
-	github.com/hashicorp/terraform-plugin-test v1.3.0 => ../terraform-plugin-test
-)
-
 require (
 	github.com/agext/levenshtein v1.2.2 // indirect
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412 // indirect
@@ -19,20 +14,19 @@ require (
 	github.com/golang/protobuf v1.3.4
 	github.com/golang/snappy v0.0.1
 	github.com/google/go-cmp v0.3.1
-	github.com/google/uuid v1.1.1
 	github.com/hashicorp/errwrap v1.0.0
 	github.com/hashicorp/go-cleanhttp v0.5.1
 	github.com/hashicorp/go-cty v1.4.1-0.20200414143053-d3edf31b6320
+	github.com/hashicorp/go-getter v1.4.2-0.20200106182914-9813cbd4eb02 // indirect
 	github.com/hashicorp/go-hclog v0.9.2
 	github.com/hashicorp/go-multierror v1.0.0
-	github.com/hashicorp/go-plugin v1.2.2
+	github.com/hashicorp/go-plugin v1.3.0
 	github.com/hashicorp/go-uuid v1.0.1
 	github.com/hashicorp/go-version v1.2.0
 	github.com/hashicorp/hcl/v2 v2.3.0
 	github.com/hashicorp/logutils v1.0.0
-	github.com/hashicorp/terraform v0.12.24 // indirect
 	github.com/hashicorp/terraform-json v0.4.0
-	github.com/hashicorp/terraform-plugin-test v1.3.0
+	github.com/hashicorp/terraform-plugin-test v1.4.0
 	github.com/hashicorp/yamux v0.0.0-20181012175058-2f1d1f20f75d // indirect
 	github.com/keybase/go-crypto v0.0.0-20161004153544-93f5b35093ba
 	github.com/kylelemons/godebug v1.1.0 // indirect

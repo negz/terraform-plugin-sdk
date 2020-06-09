@@ -27,10 +27,9 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 	// provider name here. Fortunately, when only a provider name is
 	// specified in a provider block--which is how the config file we
 	// generate does things--Terraform just automatically assumes it's in
-	// the hashicorp namespace and the default registry.terraform.io host,
+	// the legacy namespace and the default registry.terraform.io host,
 	// so we can just construct the output of GetDisplay() ourselves, based
-	// on the provider name. GetDisplay() omits the default host, so for
-	// our purposes this will always be hashicorp/PROVIDER_NAME.
+	// on the provider name.
 	providerName := wd.GetHelper().GetPluginName()
 
 	// providerName gets returned as terraform-provider-foo, and we need
@@ -58,7 +57,12 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 	}
 
 	reattachStr, err := json.Marshal(map[string]plugin.ReattachConfig{
-		"hashicorp/" + providerName: config,
+		// unfortunately, we need to populate both of them
+		// Terraform 0.12.26 and higher uses the legacy mode ("-")
+		// Terraform 0.13.0 and higher uses the default mode ("hashicorp")
+		// because of the change in how providers are addressed in 0.13
+		"registry.terraform.io/-/" + providerName:         config,
+		"registry.terraform.io/hashicorp/" + providerName: config,
 	})
 	if err != nil {
 		return err
