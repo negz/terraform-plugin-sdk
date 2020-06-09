@@ -51,6 +51,7 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 	os.Setenv("PLUGIN_PROTOCOL_VERSIONS", "5")
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	config, closeCh, err := plugin.DebugServe(ctx, opts)
 	if err != nil {
 		return err
