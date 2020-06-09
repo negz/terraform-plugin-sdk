@@ -56,14 +56,29 @@ func runProviderCommand(f func() error, wd *tftest.WorkingDir, opts *plugin.Serv
 		return err
 	}
 
-	reattachStr, err := json.Marshal(map[string]plugin.ReattachConfig{
+	reattachInfo := map[string]plugin.ReattachConfig{}
+	var namespaces []string
+	host := "registry.terraform.io"
+	if v := os.Getenv("TF_ACC_PROVIDER_NAMESPACE"); v != "" {
+		namespaces = append(namespaces, v)
+	} else {
 		// unfortunately, we need to populate both of them
 		// Terraform 0.12.26 and higher uses the legacy mode ("-")
 		// Terraform 0.13.0 and higher uses the default mode ("hashicorp")
 		// because of the change in how providers are addressed in 0.13
-		"registry.terraform.io/-/" + providerName:         config,
-		"registry.terraform.io/hashicorp/" + providerName: config,
-	})
+		namespaces = append(namespaces, "-", "hashicorp")
+	}
+	if v := os.Getenv("TF_ACC_PROVIDER_HOST"); v != "" {
+		host = v
+	}
+
+	for _, ns := range namespaces {
+		reattachInfo[strings.TrimSuffix(host, "/")+"/"+
+			strings.TrimSuffix(ns, "/")+"/"+
+			providerName] = config
+	}
+
+	reattachStr, err := json.Marshal(reattachInfo)
 	if err != nil {
 		return err
 	}
